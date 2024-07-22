@@ -49,28 +49,28 @@ def load_llm():
     return llm
 
 # Function to create vector database from in-memory file
-def create_vector_db_from_memory(file_bytes, file_type):
+def create_vector_db_from_memory(file_bytes, file_extension):
     text = ""
     
-    # Convert file bytes to text based on file type
-    if file_type == 'pdf':
+    # Convert file bytes to text based on file extension
+    if file_extension == 'pdf':
         pdf = PdfReader(BytesIO(file_bytes))
         for page in pdf.pages:
             text += page.extract_text()
-    elif file_type == 'docx':
+    elif file_extension == 'docx':
         doc = DocxDocument(BytesIO(file_bytes))
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
-    elif file_type == 'pptx':
+    elif file_extension == 'pptx':
         prs = Presentation(BytesIO(file_bytes))
         for slide in prs.slides:
             for shape in slide.shapes:
                 if hasattr(shape, "text"):
                     text += shape.text + "\n"
-    elif file_type == 'txt':
+    elif file_extension == 'txt':
         text = file_bytes.decode('utf-8')
     else:
-        raise ValueError(f"Unsupported file type: {file_type}")
+        raise ValueError(f"Unsupported file type: {file_extension}")
 
     # Create Document objects
     documents = [Document(page_content=text)]
@@ -255,16 +255,13 @@ uploaded_file = st.file_uploader("Choose a file", type=["pdf", "docx", "pptx", "
 if uploaded_file is not None:
     st.write("File uploaded:", uploaded_file.name)
     
-    # Get file bytes and type
+    # Get file bytes and extension
     file_bytes = uploaded_file.read()
-    file_type = uploaded_file.type.split('/')[1]
+    file_extension = uploaded_file.name.split('.')[-1].lower()
 
-    # Handle file type case insensitively
-    file_type = file_type.lower()
-    
     # Create vector database from uploaded file
     try:
-        vectorstore = create_vector_db_from_memory(file_bytes, file_type)
+        vectorstore = create_vector_db_from_memory(file_bytes, file_extension)
         st.session_state['vectorstore'] = vectorstore
         st.write("Vector database created from the uploaded file.")
     except ValueError as e:

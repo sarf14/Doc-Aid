@@ -2,7 +2,6 @@ import streamlit as st
 import random
 import asyncio
 import os
-import subprocess
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.prompts import PromptTemplate
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -11,11 +10,7 @@ from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 from langchain.schema import Document
 from io import BytesIO
-from ingest import create_vector_db_from_memory
-
-# Define the paths
-DB_FAISS_PATH = 'vectorstores7/db_faiss'
-DATA_FOLDER = 'data/'
+from transformers import pipeline
 
 # Define the custom prompt template for the RetrievalQA chain
 custom_prompt_template = """
@@ -52,29 +47,42 @@ def load_llm():
     )
     return llm
 
+# Function to create vector database from in-memory file
+def create_vector_db_from_memory(file_bytes, file_type):
+    # Convert file bytes to text based on file type
+    if file_type == 'pdf':
+        pdf = PdfReader(BytesIO(file_bytes))
+        text = ""
+        for page_num in range(len(pdf.pages)):
+            page = pdf.pages[page_num]
+            text += page.extract_text()
+    elif file_type == 'docx':
+        doc = Document(BytesIO(file_bytes))
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+    elif file_type == 'txt':
+        text = file_bytes.decode('utf-8')
+    else:
+        raise ValueError("Unsupported file type")
+
+    # Create Document objects and vector store
+    documents = [Document(page_content=text)]
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})
+    db = FAISS.from_documents(documents, embeddings)
+    return db
+
 # Asynchronous function to initialize the QA bot
 async def qa_bot():
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})
-    db = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
     llm = load_llm()
-    qa = retrieval_qa_chain(llm, db)
-    return qa
-
-# Predefined responses for various queries
-responses = [
-    "Here's the information I found for you. If you need anything else, just let me know!",
-    "I've got some details on that topic. Feel free to ask if you'd like more information or have other questions!",
-    "I hope this answers your question. If you'd like more details or have any other inquiries, I'm here to help!",
-    "Here are the details I have for you. If you have more questions or need further assistance, just ask!",
-    "I've gathered the relevant information for you. Let me know if there's anything more you'd like to know or if you have any other questions!"
-]
+    return llm
 
 # Function to get the QA chain
 def get_chain():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    chain = loop.run_until_complete(qa_bot())
-    return chain
+    llm = loop.run_until_complete(qa_bot())
+    return retrieval_qa_chain(llm, FAISS())
 
 # Function to handle the QA chain invocation and context-based queries
 def new_func(chain, question_text, context=None):
@@ -85,17 +93,6 @@ def new_func(chain, question_text, context=None):
         return result
     except Exception as e:
         return f"Oops! Something went wrong: {str(e)}"
-
-# Function to run the ingest.py script
-def run_ingest():
-    try:
-        # Run the ingest.py script
-        result = subprocess.run(['python', 'ingest.py'], check=True, capture_output=True, text=True)
-        st.success("All files in the data folder have been successfully processed and uploaded to the vector store.")
-        st.text(result.stdout)
-    except subprocess.CalledProcessError as e:
-        st.error("Error processing the files.")
-        st.text(e.stderr)
 
 # Custom CSS for dark mode and styled components
 st.markdown("""
@@ -154,7 +151,7 @@ st.markdown("""
     .bot .message {
         background-color: #5FB233;
         color: #ffffff;
-        align-self: flex-start;
+        align-self: flex-start.
     }
     </style>
     """, unsafe_allow_html=True)
@@ -228,19 +225,12 @@ if 'history' in st.session_state:
             st.write(f"<br>", unsafe_allow_html=True)
     st.write("</div>", unsafe_allow_html=True)
 
-# File upload section
 st.write("## Upload File")
-uploaded_file = st.file_uploader("Choose a file", type=["pdf", "pptx", "docx"])
+uploaded_file = st.file_uploader("Choose a file", type=["pdf", "docx", "txt"])
 
 if uploaded_file is not None:
     st.write("File uploaded:", uploaded_file.name)
     
     # Get file bytes and type
     file_bytes = uploaded_file.read()
-    file_type = uploaded_file.type.split('/')[1]  # Extract file type (pdf, docx, pptx)
-    
-    # Create vector DB from in-memory file
-    create_vector_db_from_memory(file_bytes, file_type)
-    
-    # Optionally, run the ingest process if needed
-    run_ingest()
+    file_type = uploaded_file.type.split('/')[1]

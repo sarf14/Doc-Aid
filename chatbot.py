@@ -48,6 +48,10 @@ def load_llm():
     )
     return llm
 
+# Function to chunk large text
+def chunk_text(text, chunk_size=4096):
+    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
 # Function to create vector database from in-memory files
 def create_vector_db_from_memory(file_list):
     documents = []
@@ -78,8 +82,10 @@ def create_vector_db_from_memory(file_list):
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
 
-        # Create Document objects and append to the list
-        documents.append(Document(page_content=text))
+        # Chunk the text if it's too large
+        text_chunks = chunk_text(text)
+        for chunk in text_chunks:
+            documents.append(Document(page_content=chunk))
 
     # Initialize embeddings
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})

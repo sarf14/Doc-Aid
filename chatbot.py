@@ -50,21 +50,19 @@ def load_llm():
 
 # Function to create vector database from in-memory file
 def create_vector_db_from_memory(file_bytes, file_type):
+    text = ""
+    
     # Convert file bytes to text based on file type
     if file_type == 'pdf':
         pdf = PdfReader(BytesIO(file_bytes))
-        text = ""
-        for page_num in range(len(pdf.pages)):
-            page = pdf.pages[page_num]
+        for page in pdf.pages:
             text += page.extract_text()
     elif file_type == 'docx':
         doc = DocxDocument(BytesIO(file_bytes))
-        text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
     elif file_type == 'pptx':
         prs = Presentation(BytesIO(file_bytes))
-        text = ""
         for slide in prs.slides:
             for shape in slide.shapes:
                 if hasattr(shape, "text"):
@@ -72,7 +70,7 @@ def create_vector_db_from_memory(file_bytes, file_type):
     elif file_type == 'txt':
         text = file_bytes.decode('utf-8')
     else:
-        raise ValueError("Unsupported file type")
+        raise ValueError(f"Unsupported file type: {file_type}")
 
     # Create Document objects
     documents = [Document(page_content=text)]
@@ -260,8 +258,14 @@ if uploaded_file is not None:
     # Get file bytes and type
     file_bytes = uploaded_file.read()
     file_type = uploaded_file.type.split('/')[1]
+
+    # Handle file type case insensitively
+    file_type = file_type.lower()
     
     # Create vector database from uploaded file
-    vectorstore = create_vector_db_from_memory(file_bytes, file_type)
-    st.session_state['vectorstore'] = vectorstore
-    st.write("Vector database created from the uploaded file.")
+    try:
+        vectorstore = create_vector_db_from_memory(file_bytes, file_type)
+        st.session_state['vectorstore'] = vectorstore
+        st.write("Vector database created from the uploaded file.")
+    except ValueError as e:
+        st.write(f"Error: {str(e)}")

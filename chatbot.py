@@ -259,7 +259,7 @@ st.write("## Upload Files")
 uploaded_files = st.file_uploader("Choose files", type=["pdf", "docx", "pptx", "txt"], accept_multiple_files=True)
 
 if uploaded_files:
-    st.write(f"{len(uploaded_files)} file(s) uploaded.")
+    st.write(f"{len(uploaded_files)} file(s) uploaded. Please wait for Vector database creation......")
     
     # Create vector database from uploaded files
     try:

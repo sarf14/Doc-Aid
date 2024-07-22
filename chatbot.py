@@ -48,32 +48,38 @@ def load_llm():
     )
     return llm
 
-# Function to create vector database from in-memory file
-def create_vector_db_from_memory(file_bytes, file_extension):
-    text = ""
+# Function to create vector database from in-memory files
+def create_vector_db_from_memory(file_list):
+    documents = []
     
-    # Convert file bytes to text based on file extension
-    if file_extension == 'pdf':
-        pdf = PdfReader(BytesIO(file_bytes))
-        for page in pdf.pages:
-            text += page.extract_text()
-    elif file_extension == 'docx':
-        doc = DocxDocument(BytesIO(file_bytes))
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-    elif file_extension == 'pptx':
-        prs = Presentation(BytesIO(file_bytes))
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if hasattr(shape, "text"):
-                    text += shape.text + "\n"
-    elif file_extension == 'txt':
-        text = file_bytes.decode('utf-8')
-    else:
-        raise ValueError(f"Unsupported file type: {file_extension}")
+    for uploaded_file in file_list:
+        file_bytes = uploaded_file.read()
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        text = ""
+        
+        # Convert file bytes to text based on file extension
+        if file_extension == 'pdf':
+            pdf = PdfReader(BytesIO(file_bytes))
+            for page in pdf.pages:
+                text += page.extract_text()
+        elif file_extension == 'docx':
+            doc = DocxDocument(BytesIO(file_bytes))
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+        elif file_extension == 'pptx':
+            prs = Presentation(BytesIO(file_bytes))
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text += shape.text + "\n"
+        elif file_extension == 'txt':
+            text = file_bytes.decode('utf-8')
+        else:
+            raise ValueError(f"Unsupported file type: {file_extension}")
 
-    # Create Document objects
-    documents = [Document(page_content=text)]
+        # Create Document objects and append to the list
+        documents.append(Document(page_content=text))
 
     # Initialize embeddings
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})
@@ -202,7 +208,7 @@ with st.form(key='chat_form', clear_on_submit=True):
         vectorstore = st.session_state.get('vectorstore', None)
         
         if vectorstore is None:
-            st.write("Please upload a file to create the vector store.")
+            st.write("Please upload files to create the vector store.")
         else:
             # Get the QA chain
             chain = get_chain(vectorstore)
@@ -249,20 +255,16 @@ if 'history' in st.session_state:
             st.write(f"<br>", unsafe_allow_html=True)
     st.write("</div>", unsafe_allow_html=True)
 
-st.write("## Upload File")
-uploaded_file = st.file_uploader("Choose a file", type=["pdf", "docx", "pptx", "txt"])
+st.write("## Upload Files")
+uploaded_files = st.file_uploader("Choose files", type=["pdf", "docx", "pptx", "txt"], accept_multiple_files=True)
 
-if uploaded_file is not None:
-    st.write("File uploaded:", uploaded_file.name)
+if uploaded_files:
+    st.write(f"{len(uploaded_files)} file(s) uploaded.")
     
-    # Get file bytes and extension
-    file_bytes = uploaded_file.read()
-    file_extension = uploaded_file.name.split('.')[-1].lower()
-
-    # Create vector database from uploaded file
+    # Create vector database from uploaded files
     try:
-        vectorstore = create_vector_db_from_memory(file_bytes, file_extension)
+        vectorstore = create_vector_db_from_memory(uploaded_files)
         st.session_state['vectorstore'] = vectorstore
-        st.write("Vector database created from the uploaded file.")
+        st.write("Vector database created from the uploaded files.")
     except ValueError as e:
         st.write(f"Error: {str(e)}")

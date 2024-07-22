@@ -75,6 +75,11 @@ def create_vector_db_from_memory(file_bytes, file_type):
     # Create FAISS index
     vectorstore = FAISS.from_documents(documents, embeddings)
     return vectorstore
+
+# Asynchronous function to initialize the QA bot
+async def qa_bot():
+    llm = load_llm()
+    return llm
 responses = [
     "Here's the information I found for you. If you need anything else, just let me know!",
     "I've got some details on that topic. Feel free to ask if you'd like more information or have other questions!",
@@ -82,10 +87,6 @@ responses = [
     "Here are the details I have for you. If you have more questions or need further assistance, just ask!",
     "I've gathered the relevant information for you. Let me know if there's anything more you'd like to know or if you have any other questions!"
 ]
-# Asynchronous function to initialize the QA bot
-async def qa_bot():
-    llm = load_llm()
-    return llm
 
 # Function to get the QA chain
 def get_chain(vectorstore):
@@ -216,25 +217,19 @@ with st.form(key='chat_form', clear_on_submit=True):
             # Add user input to chat history
             st.session_state['history'].append({"user": user_input})
 
-        try:
-    # Get the response from the QA chain
-             res = new_func(chain, question_text, st.session_state['context'])
-    
-    # Determine how to extract the answer
-             if isinstance(res, str):
-               answer = res
-             elif isinstance(res, dict) and "result" in res:
-               answer = res.get("result", "No result found")
-             else:
-               answer = "No result found"
-        except Exception as e:
-               st.write("Oops! Something went wrong:", str(e))
-               answer = "Sorry, there was an issue with your request. Please try again later."
+            try:
+                # Get the response from the QA chain
+                res = new_func(chain, question_text, st.session_state['context'])
+                answer = res if isinstance(res, str) else res.get("result", "No result found")
+            except Exception as e:
+                st.write("Oops! Something went wrong:", str(e))
+                answer = "Sorry, there was an issue with your request. Please try again later."
 
-# Add bot response to chat history and append a friendly message
-st.session_state['history'].append({"bot": answer})
-answer += "\n" + random.choice(responses)
-st.write(answer)
+            # Add bot response to chat history and append a friendly message
+            st.session_state['history'].append({"bot": answer})
+            answer += "\n" + random.choice(responses)
+            st.write(answer)
+
 # Display chat history
 if 'history' in st.session_state:
     st.write("<div class='history'><h3>Chat History:</h3>", unsafe_allow_html=True)

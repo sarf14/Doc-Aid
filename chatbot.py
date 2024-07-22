@@ -220,7 +220,7 @@ with st.form(key='chat_form', clear_on_submit=True):
 
             # Add bot response to chat history and append a friendly message
             st.session_state['history'].append({"bot": answer})
-            answer += "\n" + random.choice(responses)
+            answer += "\n" + random.choice(res)
             st.write(answer)
 
 # Display chat history

@@ -1,7 +1,6 @@
 import streamlit as st
 import random
 import asyncio
-import os
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.prompts import PromptTemplate
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -67,11 +66,15 @@ def create_vector_db_from_memory(file_bytes, file_type):
     else:
         raise ValueError("Unsupported file type")
 
-    # Create Document objects and vector store
+    # Create Document objects
     documents = [Document(page_content=text)]
+
+    # Initialize embeddings
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={'device': 'cpu'})
-    db = FAISS.from_documents(documents, embeddings)
-    return db
+
+    # Create FAISS index
+    vectorstore = FAISS.from_documents(documents, embeddings)
+    return vectorstore
 
 # Asynchronous function to initialize the QA bot
 async def qa_bot():
@@ -79,11 +82,11 @@ async def qa_bot():
     return llm
 
 # Function to get the QA chain
-def get_chain():
+def get_chain(vectorstore):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     llm = loop.run_until_complete(qa_bot())
-    return retrieval_qa_chain(llm, FAISS())
+    return retrieval_qa_chain(llm, vectorstore)
 
 # Function to handle the QA chain invocation and context-based queries
 def new_func(chain, question_text, context=None):
@@ -181,38 +184,44 @@ with st.form(key='chat_form', clear_on_submit=True):
     submit_button = st.form_submit_button(label='Submit')
 
     if submit_button and user_input:
-        # Get the QA chain
-        chain = get_chain()
-        # Check if elaboration is needed based on user input
-        elaboration_needed = "please elaborate" in user_input.lower() or "expand on that" in user_input.lower() or "give more details" in user_input.lower()
+        # Get the vector store from uploaded file
+        vectorstore = st.session_state.get('vectorstore', None)
         
-        if elaboration_needed:
-            # If elaboration is needed, use the last bot response as context
-            if len(st.session_state['history']) > 0 and 'bot' in st.session_state['history'][-1]:
-                last_bot_response = st.session_state['history'][-1]['bot']
-                question_text = f"Can you provide more details or context on this: {last_bot_response}?"
-                st.session_state['context'] += f"\nElaboration on: {last_bot_response}"
-            else:
-                question_text = "I don't have a previous response to elaborate on. Could you please ask a different question?"
+        if vectorstore is None:
+            st.write("Please upload a file to create the vector store.")
         else:
-            # Otherwise, use the current user input
-            question_text = user_input
+            # Get the QA chain
+            chain = get_chain(vectorstore)
+            # Check if elaboration is needed based on user input
+            elaboration_needed = "please elaborate" in user_input.lower() or "expand on that" in user_input.lower() or "give more details" in user_input.lower()
+            
+            if elaboration_needed:
+                # If elaboration is needed, use the last bot response as context
+                if len(st.session_state['history']) > 0 and 'bot' in st.session_state['history'][-1]:
+                    last_bot_response = st.session_state['history'][-1]['bot']
+                    question_text = f"Can you provide more details or context on this: {last_bot_response}?"
+                    st.session_state['context'] += f"\nElaboration on: {last_bot_response}"
+                else:
+                    question_text = "I don't have a previous response to elaborate on. Could you please ask a different question?"
+            else:
+                # Otherwise, use the current user input
+                question_text = user_input
 
-        # Add user input to chat history
-        st.session_state['history'].append({"user": user_input})
+            # Add user input to chat history
+            st.session_state['history'].append({"user": user_input})
 
-        try:
-            # Get the response from the QA chain
-            res = new_func(chain, question_text, st.session_state['context'])
-            answer = res if isinstance(res, str) else res.get("result", "No result found")
-        except Exception as e:
-            st.write("Oops! Something went wrong:", str(e))
-            answer = "Sorry, there was an issue with your request. Please try again later."
+            try:
+                # Get the response from the QA chain
+                res = new_func(chain, question_text, st.session_state['context'])
+                answer = res if isinstance(res, str) else res.get("result", "No result found")
+            except Exception as e:
+                st.write("Oops! Something went wrong:", str(e))
+                answer = "Sorry, there was an issue with your request. Please try again later."
 
-        # Add bot response to chat history and append a friendly message
-        st.session_state['history'].append({"bot": answer})
-        answer += "\n" + random.choice(res)
-        st.write(answer)
+            # Add bot response to chat history and append a friendly message
+            st.session_state['history'].append({"bot": answer})
+            answer += "\n" + random.choice(responses)
+            st.write(answer)
 
 # Display chat history
 if 'history' in st.session_state:
@@ -237,5 +246,6 @@ if uploaded_file is not None:
     file_type = uploaded_file.type.split('/')[1]
     
     # Create vector database from uploaded file
-    db = create_vector_db_from_memory(file_bytes, file_type)
+    vectorstore = create_vector_db_from_memory(file_bytes, file_type)
+    st.session_state['vectorstore'] = vectorstore
     st.write("Vector database created from the uploaded file.")

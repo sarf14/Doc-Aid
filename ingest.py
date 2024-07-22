@@ -1,5 +1,6 @@
 import os
 import logging
+import langchain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PyPDFLoader
 from langchain.vectorstores import FAISS

@@ -11,6 +11,7 @@ from langchain.schema import Document
 from io import BytesIO
 from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
+from pptx import Presentation
 
 # Define the custom prompt template for the RetrievalQA chain
 custom_prompt_template = """
@@ -61,6 +62,13 @@ def create_vector_db_from_memory(file_bytes, file_type):
         text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
+    elif file_type == 'pptx':
+        prs = Presentation(BytesIO(file_bytes))
+        text = ""
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text += shape.text + "\n"
     elif file_type == 'txt':
         text = file_bytes.decode('utf-8')
     else:
@@ -80,6 +88,7 @@ def create_vector_db_from_memory(file_bytes, file_type):
 async def qa_bot():
     llm = load_llm()
     return llm
+
 responses = [
     "Here's the information I found for you. If you need anything else, just let me know!",
     "I've got some details on that topic. Feel free to ask if you'd like more information or have other questions!",
@@ -162,7 +171,7 @@ st.markdown("""
     .bot .message {
         background-color: #5FB233;
         color: #ffffff;
-        align-self: flex-start.
+        align-self: flex-start;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -243,7 +252,7 @@ if 'history' in st.session_state:
     st.write("</div>", unsafe_allow_html=True)
 
 st.write("## Upload File")
-uploaded_file = st.file_uploader("Choose a file", type=["pdf", "docx", "txt"])
+uploaded_file = st.file_uploader("Choose a file", type=["pdf", "docx", "pptx", "txt"])
 
 if uploaded_file is not None:
     st.write("File uploaded:", uploaded_file.name)

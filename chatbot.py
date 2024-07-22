@@ -13,8 +13,6 @@ from langchain.schema import Document
 from io import BytesIO
 from ingest import create_vector_db_from_memory
 
-
-
 # Define the paths
 DB_FAISS_PATH = 'vectorstores7/db_faiss'
 DATA_FOLDER = 'data/'
@@ -156,7 +154,7 @@ st.markdown("""
     .bot .message {
         background-color: #5FB233;
         color: #ffffff;
-        align-self: flex-start.
+        align-self: flex-start;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -230,6 +228,7 @@ if 'history' in st.session_state:
             st.write(f"<br>", unsafe_allow_html=True)
     st.write("</div>", unsafe_allow_html=True)
 
+# File upload section
 st.write("## Upload File")
 uploaded_file = st.file_uploader("Choose a file", type=["pdf", "pptx", "docx"])
 

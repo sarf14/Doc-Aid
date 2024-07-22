@@ -10,4 +10,3 @@ docx
 pypdf2
 sentence-transformers
 asyncio
-pptx

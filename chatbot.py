@@ -10,7 +10,8 @@ from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 from langchain.schema import Document
 from io import BytesIO
-from transformers import pipeline
+from PyPDF2 import PdfReader
+from docx import Document as DocxDocument
 
 # Define the custom prompt template for the RetrievalQA chain
 custom_prompt_template = """
@@ -57,7 +58,7 @@ def create_vector_db_from_memory(file_bytes, file_type):
             page = pdf.pages[page_num]
             text += page.extract_text()
     elif file_type == 'docx':
-        doc = Document(BytesIO(file_bytes))
+        doc = DocxDocument(BytesIO(file_bytes))
         text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
@@ -210,7 +211,7 @@ with st.form(key='chat_form', clear_on_submit=True):
 
         # Add bot response to chat history and append a friendly message
         st.session_state['history'].append({"bot": answer})
-        answer += "\n" + random.choice(responses)
+        answer += "\n" + random.choice(res)
         st.write(answer)
 
 # Display chat history
@@ -234,3 +235,7 @@ if uploaded_file is not None:
     # Get file bytes and type
     file_bytes = uploaded_file.read()
     file_type = uploaded_file.type.split('/')[1]
+    
+    # Create vector database from uploaded file
+    db = create_vector_db_from_memory(file_bytes, file_type)
+    st.write("Vector database created from the uploaded file.")

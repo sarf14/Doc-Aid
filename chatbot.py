@@ -109,11 +109,20 @@ def get_chain(vectorstore):
     return retrieval_qa_chain(llm, vectorstore)
 
 # Function to handle the QA chain invocation and context-based queries
-def new_func(chain, question_text, context=None):
+def new_func(chain, question_text, context=None, max_length=4096):
     try:
         if context:
-            question_text = f"{context}\n{question_text}"
-        result = chain.invoke(question_text)
+            combined_text = f"{context}\n{question_text}"
+        else:
+            combined_text = question_text
+
+        # Ensure the combined text length does not exceed the max_length
+        if len(combined_text) > max_length:
+            # Truncate the context to fit within the max_length
+            truncated_context = context[-(max_length - len(question_text)):]
+            combined_text = f"{truncated_context}\n{question_text}"
+
+        result = chain.invoke(combined_text)
         return result
     except Exception as e:
         return f"Oops! Something went wrong: {str(e)}"
@@ -208,63 +217,33 @@ with st.form(key='chat_form', clear_on_submit=True):
         vectorstore = st.session_state.get('vectorstore', None)
         
         if vectorstore is None:
-            st.write("Please upload files to create the vector store.")
+            st.write("Please upload files to create the vector store first.")
         else:
-            # Get the QA chain
+            # Retrieve the chain
             chain = get_chain(vectorstore)
-            # Check if elaboration is needed based on user input
-            elaboration_needed = "please elaborate" in user_input.lower() or "expand on that" in user_input.lower() or "give more details" in user_input.lower()
             
-            if elaboration_needed:
-                # If elaboration is needed, use the last bot response as context
-                if len(st.session_state['history']) > 0 and 'bot' in st.session_state['history'][-1]:
-                    last_bot_response = st.session_state['history'][-1]['bot']
-                    question_text = f"Can you provide more details or context on this: {last_bot_response}?"
-                    st.session_state['context'] += f"\nElaboration on: {last_bot_response}"
-                else:
-                    question_text = "I don't have a previous response to elaborate on. Could you please ask a different question?"
-            else:
-                # Otherwise, use the current user input
-                question_text = user_input
+            # Invoke the chain to get the response
+            response = new_func(chain, user_input, context=st.session_state['context'])
+            
+            # Update chat history and context
+            st.session_state['history'].append({"user": user_input, "bot": response})
+            st.session_state['context'] += f"\n{user_input}\n{response}"
+            
+            # Display the conversation history
+            for chat in st.session_state['history']:
+                st.markdown(f"<div class='history'><div class='user'><div class='message'>{chat['user']}</div></div></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='history'><div class='bot'><div class='message'>{random.choice(responses)}</div></div></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='history'><div class='bot'><div class='message'>{chat['bot']}</div></div></div>", unsafe_allow_html=True)
 
-            # Add user input to chat history
-            st.session_state['history'].append({"user": user_input})
+# File upload section for creating vector store
+st.markdown("## Upload Files to Create Vector Store")
+uploaded_files = st.file_uploader("Upload PDF, DOCX, PPTX, or TXT files", accept_multiple_files=True)
 
-            try:
-                # Get the response from the QA chain
-                res = new_func(chain, question_text, st.session_state['context'])
-                answer = res if isinstance(res, str) else res.get("result", "No result found")
-            except Exception as e:
-                st.write("Oops! Something went wrong:", str(e))
-                answer = "Sorry, there was an issue with your request. Please try again later."
-
-            # Add bot response to chat history and append a friendly message
-            st.session_state['history'].append({"bot": answer})
-            answer += "\n" + random.choice(responses)
-            st.write(answer)
-
-# Display chat history
-if 'history' in st.session_state:
-    st.write("<div class='history'><h3>Chat History:</h3>", unsafe_allow_html=True)
-    for entry in st.session_state['history']:
-        if 'user' in entry:
-            st.write(f"<div class='user'><div class='user'>User</div><div class='message'>{entry['user']}</div></div>", unsafe_allow_html=True)
-            st.write(f"<br>", unsafe_allow_html=True)
-        if 'bot' in entry:
-            st.write(f"<div class='bot'><div class='bot'>Godrej Guide</div><div class='message'>{entry['bot']}</div></div>", unsafe_allow_html=True)
-            st.write(f"<br>", unsafe_allow_html=True)
-    st.write("</div>", unsafe_allow_html=True)
-
-st.write("## Upload Files")
-uploaded_files = st.file_uploader("Choose files", type=["pdf", "docx", "pptx", "txt"], accept_multiple_files=True)
-
-if uploaded_files:
-    st.write(f"{len(uploaded_files)} file(s) uploaded Please wait for Vector database creation......")
-    
-    # Create vector database from uploaded files
-    try:
+if st.button("Create Vector Store"):
+    if uploaded_files:
+        # Create vector store from uploaded files
         vectorstore = create_vector_db_from_memory(uploaded_files)
         st.session_state['vectorstore'] = vectorstore
-        st.write("Vector database created from the uploaded files.")
-    except ValueError as e:
-        st.write(f"Error: {str(e)}")
+        st.write("Vector store created successfully!")
+    else:
+        st.write("Please upload at least one file.")

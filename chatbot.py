@@ -187,15 +187,15 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Header section with logo and title
-st.image("./images/godrej.png", width=100)  # Adjust width as needed
+# st.image("./images/godrej.png", width=100)  # Adjust width as needed
 st.markdown("""
     <div class="header">
-        <h1>Godrej Guide Support Chat</h1>
+        <h1>Doc-Aid Support Chat</h1>
     </div>
     """, unsafe_allow_html=True)
 
 # Greet the user
-st.write('Hello there! 👋 Welcome to the support chat. How can I assist you today?')
+st.write('Hello there! 👋 Welcome to the doc support chat. How can I assist you today?')
 
 # Initialize session state for chat history and context
 if 'history' not in st.session_state:

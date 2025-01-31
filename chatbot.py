@@ -41,7 +41,7 @@ def retrieval_qa_chain(llm, db):
 # Function to load the language model (LLM)
 def load_llm():
     llm = ChatGroq(
-        groq_api_key="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",
+        groq_api_key="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",
         model_name="Llama3-8b-8192",
         max_tokens=8192,
         temperature=0.5

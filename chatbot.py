@@ -257,7 +257,7 @@ if 'history' in st.session_state:
             st.write(f"<div class='user'><div class='user'>User</div><div class='message'>{entry['user']}</div></div>", unsafe_allow_html=True)
             st.write(f"<br>", unsafe_allow_html=True)
         if 'bot' in entry:
-            st.write(f"<div class='bot'><div class='bot'>Godrej Guide</div><div class='message'>{entry['bot']}</div></div>", unsafe_allow_html=True)
+            st.write(f"<div class='bot'><div class='bot'>Bored Asmi</div><div class='message'>{entry['bot']}</div></div>", unsafe_allow_html=True)
             st.write(f"<br>", unsafe_allow_html=True)
     st.write("</div>", unsafe_allow_html=True)
 
